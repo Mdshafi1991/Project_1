@@ -1,0 +1,51 @@
+Q1
+
+SELECT CustID from 
+(SELECT *,DENSE_RANK() over(order by count desc) RANK FROM 
+(SELECT CustID,Status,count(status) count FROM Campaign_Data
+WHERE status ='delivered'
+group by CustID,status) A) B
+WHERE RANK=5;
+
+
+Q2
+
+SELECT AVG(DATEDIFF(MINUTE,sale_timestamp,delivered_timestamp)) avg_del_time,shiptostate FROM Customer_Delivery_Data
+where sale_timestamp is not null 
+AND
+delivered_timestamp is not NULL
+AND shiptostate is not NULL
+group by shiptostate;
+
+
+
+Q3
+
+create view view1 
+AS
+SELECT CUSTID,
+cast(concat(year(Orderdate),'-',month(Orderdate),'-','01') as DATE) order_month,
+sum(saleValue) as Monthly_sales
+from Customer_Transaction_Data
+ 
+group by CUSTID, month(Orderdate),year(Orderdate);
+
+SELECT CUSTID FROM 
+(SELECT
+    CUSTID,
+    LAG(order_month) OVER (PARTITION BY CUSTID ORDER BY order_month) AS previous_order_month,
+	 order_month current_order_month,
+	 LEAD(order_month) OVER (PARTITION BY CUSTID ORDER BY order_month) AS next_order_month,
+	 LAG(monthly_sales) OVER (PARTITION BY CUSTID ORDER BY order_month) AS previous_month_sales,
+	 monthly_sales current_month_sales,
+	 LEAD(monthly_sales) OVER (PARTITION BY CUSTID ORDER BY order_month) AS next_month_sales
+FROM
+    view1) B
+where 
+DATEDIFF(month,previous_order_month,current_order_month)=1
+AND
+DATEDIFF(month,current_order_month,next_order_month)=1
+AND
+current_month_sales > previous_month_sales and next_month_sales > current_month_sales;
+HAVING AVG(DATEDIFF(MINUTE,sale_timestamp,delivered_timestamp))>0
+order by avg_del_time;
